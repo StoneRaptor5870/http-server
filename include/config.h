@@ -8,4 +8,8 @@
 #define MAX_METHOD_LENGTH 16
 #define MAX_CONNECTIONS 10
 
+// Database SettingsAdd commentMore actions
+#define DB_NAME "httpserver.db"
+#define ENABLE_WAL_MODE 1
+
 #endif // CONFIG_H

@@ -86,6 +86,10 @@ void handle_get_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     {
         route_home(request, response);
     }
+    else if (strncmp(request->path, "/api/users/", 11) == 0)
+    {
+        route_get_user_by_id(request, response);
+    }
     else if (strcmp(request->path, "/about") == 0)
     {
         route_about(request, response);

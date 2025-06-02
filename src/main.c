@@ -6,8 +6,10 @@
 #include "../include/config.h"
 #include "../include/server.h"
 #include "../include/handler.h"
+#include "../include/database.h"
 
 static TCP_SERVER server;
+Database app_db;
 
 void signal_handler(int sig)
 {
@@ -15,6 +17,7 @@ void signal_handler(int sig)
 
     printf("\nShutting down server...\n");
     server_close(&server);
+    db_close(&app_db);
     exit(0);
 }
 
@@ -57,6 +60,20 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    // Initialize database
+    if (db_init(&app_db, "httpserver.db") < 0)
+    {
+        fprintf(stderr, "Failed to initialize database\n");
+        exit(1);
+    }
+
+    if (db_create_tables(&app_db) < 0)
+    {
+        fprintf(stderr, "Failed to create tables\n");
+        db_close(&app_db);
+        exit(1);
+    }
+
     printf("Server listening on http://localhost:%d\n", port);
     printf("Press Ctrl+C to stop the server\n\n");
 
@@ -83,5 +100,6 @@ int main(int argc, char *argv[])
     }
 
     server_close(&server);
+    db_close(&app_db);
     return 0;
 }

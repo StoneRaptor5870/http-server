@@ -9,6 +9,7 @@ void route_about(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
 void route_not_found(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
 
 void route_get_users(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
+void route_get_user_by_id(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
 void route_create_user(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
 void route_update_user(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
 void route_partial_update_user(const HTTP_REQUEST *request, HTTP_RESPONSE *response);

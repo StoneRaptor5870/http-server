@@ -1,5 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -g -I./include
+LIB = -lsqlite3
 SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
@@ -22,7 +23,7 @@ directories:
 
 # Link object files to create executable
 $(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@ $(LIB)
 
 # Compile source files into object files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c

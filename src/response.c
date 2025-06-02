@@ -21,6 +21,8 @@ static const char *get_status_text(HTTP_STATUS status)
         return "405 Method Not Allowed";
     case HTTP_500_INTERNAL_ERROR:
         return "500 Internal Server Error";
+    case HTTP_409_CONFLICT:
+        return "409 Conflict";
     default:
         return "200 OK";
     }
