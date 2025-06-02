@@ -9,8 +9,14 @@ typedef void (*ROUTE_HANDLER)(const HTTP_REQUEST *request, HTTP_RESPONSE *respon
 
 // HTTP handler functions
 void handle_http_request(int client_socket);
-void route_home(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
-void route_about(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
-void route_not_found(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
+
+// Method-specific handlers
+void handle_get_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
+void handle_post_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
+void handle_put_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
+void handle_patch_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
+void handle_delete_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
+
+void route_method_not_allowed(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
 
 #endif // HANDLER_H

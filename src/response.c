@@ -9,8 +9,16 @@ static const char *get_status_text(HTTP_STATUS status)
     {
     case HTTP_200_OK:
         return "200 OK";
+    case HTTP_201_CREATED:
+        return "201 Created";
+    case HTTP_400_BAD_REQUEST:
+        return "400 Bad Request";
+    case HTTP_401_UNAUTHORIZED:
+        return "401 Unauthorized";
     case HTTP_404_NOT_FOUND:
         return "404 Not Found";
+    case HTTP_405_METHOD_NOT_ALLOWED:
+        return "405 Method Not Allowed";
     case HTTP_500_INTERNAL_ERROR:
         return "500 Internal Server Error";
     default:
