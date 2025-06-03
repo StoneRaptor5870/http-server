@@ -11,7 +11,7 @@ void route_get_css(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
     (void)request;
 
-    if (strcmp(request->path, "/css/style.css") == 0)
+    if (strcmp(request->clean_path, "/css/style.css") == 0)
     {
         serve_static_file(request, response);
         return;
@@ -22,7 +22,7 @@ void route_get_js(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
     (void)request;
 
-    if (strcmp(request->path, "/js/app.js") == 0)
+    if (strcmp(request->clean_path, "/js/app.js") == 0)
     {
         serve_static_file(request, response);
         return;
@@ -32,14 +32,14 @@ void route_get_js(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 void route_home(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
     // For root path
-    if (strcmp(request->path, "/") == 0)
+    if (strcmp(request->clean_path, "/") == 0)
     {
         serve_static_file(request, response);
         return;
     }
 
     // If it's not an API route
-    if (strncmp(request->path, "/api/", 5) != 0)
+    if (strncmp(request->clean_path, "/api/", 5) != 0)
     {
         serve_static_file(request, response);
         return;
@@ -69,7 +69,7 @@ void route_about(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
     (void)request;
 
-    if (strcmp(request->path, "/about") == 0)
+    if (strcmp(request->clean_path, "/about") == 0)
     {
         serve_static_file(request, response);
         return;
@@ -106,10 +106,29 @@ void route_about(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 // API Routes
 void route_get_users(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
-    (void)request;
+    if (!request || !response)
+    {
+        return;
+    }
+
     char json_buffer[4096];
 
-    int result = db_get_users(&app_db, json_buffer, sizeof(json_buffer));
+    // Check for query parameters like ?limit=10&offset=20&search=john
+    const char *limit_str = get_query_param(request, "limit");
+    const char *offset_str = get_query_param(request, "offset");
+    const char *search_str = get_query_param(request, "search");
+
+    int limit = limit_str ? atoi(limit_str) : 10;   // Default limit
+    int offset = offset_str ? atoi(offset_str) : 0; // Default offset
+
+    printf("Getting users with limit=%d, offset=%d", limit, offset);
+    if (search_str)
+    {
+        printf(", search='%s'", search_str);
+    }
+    printf("\n");
+
+    int result = db_get_users(&app_db, json_buffer, sizeof(json_buffer), limit, offset, search_str);
 
     if (result >= 0)
     {
@@ -119,75 +138,85 @@ void route_get_users(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     }
     else
     {
+        // Handle error case
+        const char *error_json = "{\"error\":\"Failed to retrieve users\"}";
         http_response_set_status(response, HTTP_500_INTERNAL_ERROR);
-        http_response_set_body(response, "{\"error\":\"Database error\"}");
+        http_response_set_content_type(response, "application/json");
+        http_response_set_body(response, error_json);
     }
 }
 
 void route_get_user_by_id(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
+    if (!request || !response)
+    {
+        return;
+    }
+
     char body[1024];
     char user_json[512];
 
     // Extract user ID from URL path "/api/users/123"
-    const char *user_id_str = request->path + 11; // Skip "/api/users/"
-    int user_id = atoi(user_id_str);
-
-    if (user_id <= 0)
+    // Get URL parameter safely
+    const char *user_id_str = get_url_param(request, "id");
+    if (!user_id_str || strlen(user_id_str) == 0)
     {
         snprintf(body, sizeof(body),
                  "{\n"
                  "  \"error\": \"Bad Request\",\n"
-                 "  \"message\": \"Invalid user ID\"\n"
+                 "  \"message\": \"User ID is missing\"\n"
                  "}");
-
         http_response_set_status(response, HTTP_400_BAD_REQUEST);
         http_response_set_content_type(response, "application/json");
         http_response_set_body(response, body);
         return;
     }
 
-    printf("Getting user %d\n", user_id);
+    char *endptr;
+    int user_id = strtol(user_id_str, &endptr, 10);
+    if (*endptr != '\0' || user_id <= 0)
+    {
+        snprintf(body, sizeof(body),
+                 "{\n"
+                 "  \"error\": \"Bad Request\",\n"
+                 "  \"message\": \"Invalid user ID\"\n"
+                 "}");
+        http_response_set_status(response, HTTP_400_BAD_REQUEST);
+        http_response_set_content_type(response, "application/json");
+        http_response_set_body(response, body);
+        return;
+    }
 
-    // Get user from database
     int result = db_get_user_by_id(&app_db, user_id, user_json, sizeof(user_json));
 
     if (result > 0)
     {
-        // Success - user found
         http_response_set_status(response, HTTP_200_OK);
         http_response_set_content_type(response, "application/json");
         http_response_set_body(response, user_json);
-        printf("User %d retrieved successfully\n", user_id);
     }
     else if (result == 0)
     {
-        // User not found
         snprintf(body, sizeof(body),
                  "{\n"
                  "  \"error\": \"Not Found\",\n"
                  "  \"message\": \"User with ID %d not found\"\n"
                  "}",
                  user_id);
-
         http_response_set_status(response, HTTP_404_NOT_FOUND);
         http_response_set_content_type(response, "application/json");
         http_response_set_body(response, body);
-        printf("User %d not found\n", user_id);
     }
     else
     {
-        // Database error
         snprintf(body, sizeof(body),
                  "{\n"
                  "  \"error\": \"Internal Server Error\",\n"
                  "  \"message\": \"Database error occurred while retrieving user\"\n"
                  "}");
-
         http_response_set_status(response, HTTP_500_INTERNAL_ERROR);
         http_response_set_content_type(response, "application/json");
         http_response_set_body(response, body);
-        printf("Database error while retrieving user %d\n", user_id);
     }
 }
 
@@ -288,7 +317,7 @@ void route_update_user(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     char password[256];
 
     // Extract user ID from URL path "/api/users/123"
-    const char *user_id_str = request->path + 11; // Skip "/api/users/"
+    const char *user_id_str = get_url_param(request, "id");
     int user_id = atoi(user_id_str);
 
     if (user_id <= 0)
@@ -408,7 +437,7 @@ void route_partial_update_user(const HTTP_REQUEST *request, HTTP_RESPONSE *respo
     char email[256] = {0};
 
     // Extract user ID from URL path "/api/users/123"
-    const char *user_id_str = request->path + 11; // Skip "/api/users/"
+    const char *user_id_str = get_url_param(request, "id");
     int user_id = atoi(user_id_str);
 
     if (user_id <= 0)
@@ -560,7 +589,7 @@ void route_partial_update_user(const HTTP_REQUEST *request, HTTP_RESPONSE *respo
 void route_delete_user(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
     char body[512];
-    const char *user_id_str = request->path + 11; // Skip "/api/users/"
+    const char *user_id_str = get_url_param(request, "id");
     int user_id = atoi(user_id_str);
 
     if (user_id <= 0)

@@ -94,22 +94,84 @@ int db_create_user(Database *db, const char *name, const char *email, const char
     return user_id;
 }
 
-int db_get_users(Database *db, char *json_output, int max_len)
+int db_get_users(Database *db, char *json_output, int max_len, int limit, int offset, const char *search)
 {
     if (!db || !db->db || !json_output || max_len <= 0)
     {
         return -1;
     }
 
-    const char *sql = "SELECT id, name, email, created_at FROM users ORDER BY id;";
-    sqlite3_stmt *stmt;
+    char sql[1024];
+    char count_sql[1024];
 
-    int rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
+    if (search && strlen(search) > 0)
+    {
+        // SQL with search functionality
+        snprintf(sql, sizeof(sql),
+                 "SELECT id, name, email, created_at FROM users "
+                 "WHERE name LIKE ? OR email LIKE ? "
+                 "ORDER BY id LIMIT ? OFFSET ?;");
+
+        snprintf(count_sql, sizeof(count_sql),
+                 "SELECT COUNT(*) FROM users "
+                 "WHERE name LIKE ? OR email LIKE ?;");
+    }
+    else
+    {
+        // SQL without search
+        snprintf(sql, sizeof(sql),
+                 "SELECT id, name, email, created_at FROM users "
+                 "ORDER BY id LIMIT ? OFFSET ?;");
+
+        snprintf(count_sql, sizeof(count_sql),
+                 "SELECT COUNT(*) FROM users;");
+    }
+
+    sqlite3_stmt *count_stmt;
+    int rc = sqlite3_prepare_v2(db->db, count_sql, -1, &count_stmt, NULL);
+    if (rc != SQLITE_OK)
+    {
+        fprintf(stderr, "Failed to prepare count statement: %s\n", sqlite3_errmsg(db->db));
+        return -1;
+    }
+
+    // Bind parameters for count query
+    int param_index = 1;
+    if (search && strlen(search) > 0)
+    {
+        char search_pattern[256];
+        snprintf(search_pattern, sizeof(search_pattern), "%%%s%%", search);
+        sqlite3_bind_text(count_stmt, param_index++, search_pattern, -1, SQLITE_STATIC);
+        sqlite3_bind_text(count_stmt, param_index++, search_pattern, -1, SQLITE_STATIC);
+    }
+
+    int total_count = 0;
+    if (sqlite3_step(count_stmt) == SQLITE_ROW)
+    {
+        total_count = sqlite3_column_int(count_stmt, 0);
+    }
+    sqlite3_finalize(count_stmt);
+
+    // Now prepare the main query
+    sqlite3_stmt *stmt;
+    rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
     {
         fprintf(stderr, "Failed to prepare statement: %s\n", sqlite3_errmsg(db->db));
         return -1;
     }
+
+    // Bind parameters for main query
+    param_index = 1;
+    if (search && strlen(search) > 0)
+    {
+        char search_pattern[256];
+        snprintf(search_pattern, sizeof(search_pattern), "%%%s%%", search);
+        sqlite3_bind_text(stmt, param_index++, search_pattern, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, param_index++, search_pattern, -1, SQLITE_STATIC);
+    }
+    sqlite3_bind_int(stmt, param_index++, limit);
+    sqlite3_bind_int(stmt, param_index++, offset);
 
     // Start building JSON
     int written = snprintf(json_output, max_len, "{\"users\":[");
@@ -138,7 +200,7 @@ int db_get_users(Database *db, char *json_output, int max_len)
                 break;
         }
 
-        // Add user object
+        // Add user object - escape quotes in strings to prevent JSON issues
         int user_written = snprintf(json_output + written, max_len - written,
                                     "{\"id\":%d,\"name\":\"%s\",\"email\":\"%s\",\"created_at\":\"%s\"}",
                                     id, name ? name : "", email ? email : "", created_at ? created_at : "");
@@ -158,8 +220,10 @@ int db_get_users(Database *db, char *json_output, int max_len)
         return -1;
     }
 
-    // Close JSON
-    written += snprintf(json_output + written, max_len - written, "],\"count\":%d}", user_count);
+    // Close JSON with metadata
+    written += snprintf(json_output + written, max_len - written,
+                        "],\"count\":%d,\"total\":%d,\"limit\":%d,\"offset\":%d}",
+                        user_count, total_count, limit, offset);
 
     sqlite3_finalize(stmt);
 

@@ -81,31 +81,35 @@ void handle_http_request(int client_socket)
     http_response_cleanup(&response);
 }
 
-void handle_get_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
+void handle_get_request(HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
-    if (strcmp(request->path, "/") == 0 || strcmp(request->path, "/index.html") == 0)
+    // Check for exact matches first
+    if (strcmp(request->clean_path, "/") == 0 || strcmp(request->clean_path, "/index.html") == 0)
     {
         route_home(request, response);
     }
-    else if (strncmp(request->path, "/api/users/", 11) == 0)
-    {
-        route_get_user_by_id(request, response);
-    }
-    else if (strncmp(request->path, "/css/style.css", 14) == 0)
+    else if (strcmp(request->clean_path, "/css/style.css") == 0)
     {
         route_get_css(request, response);
     }
-    else if (strncmp(request->path, "/js/app.js", 10) == 0)
+    else if (strcmp(request->clean_path, "/js/app.js") == 0)
     {
         route_get_js(request, response);
     }
-    else if (strcmp(request->path, "/about") == 0 || strcmp(request->path, "/about.html") == 0)
+    else if (strcmp(request->clean_path, "/about") == 0 || strcmp(request->clean_path, "/about.html") == 0)
     {
         route_about(request, response);
     }
-    else if (strncmp(request->path, "/api/users", 10) == 0)
+    else if (strcmp(request->clean_path, "/api/users") == 0)
     {
         route_get_users(request, response);
+    }
+    // Check for parameterized routes
+    else if (match_path_pattern("/api/users/{id}", request->clean_path))
+    {
+        extract_and_store_url_params(request, "/api/users/{id}");
+        http_request_print(request);
+        route_get_user_by_id(request, response);
     }
     else
     {
@@ -113,7 +117,7 @@ void handle_get_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     }
 }
 
-void handle_post_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
+void handle_post_request(HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
     if (strcmp(request->path, "/api/users") == 0)
     {
@@ -129,10 +133,11 @@ void handle_post_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     }
 }
 
-void handle_put_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
+void handle_put_request(HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
-    if (strncmp(request->path, "/api/users/", 11) == 0)
+    if (match_path_pattern("/api/users/{id}", request->clean_path))
     {
+        extract_and_store_url_params(request, "/api/users/{id}");
         route_update_user(request, response);
     }
     else
@@ -141,10 +146,11 @@ void handle_put_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     }
 }
 
-void handle_patch_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
+void handle_patch_request(HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
-    if (strncmp(request->path, "/api/users/", 11) == 0)
+    if (match_path_pattern("/api/users/{id}", request->clean_path))
     {
+        extract_and_store_url_params(request, "/api/users/{id}");
         route_partial_update_user(request, response);
     }
     else
@@ -153,10 +159,11 @@ void handle_patch_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     }
 }
 
-void handle_delete_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
+void handle_delete_request(HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
-    if (strncmp(request->path, "/api/users/", 11) == 0)
+    if (match_path_pattern("/api/users/{id}", request->clean_path))
     {
+        extract_and_store_url_params(request, "/api/users/{id}");
         route_delete_user(request, response);
     }
     else

@@ -18,7 +18,7 @@ int db_create_tables(Database *db);
 
 // User operations
 int db_create_user(Database *db, const char *name, const char *email, const char *password);
-int db_get_users(Database *db, char *json_output, int max_len);
+int db_get_users(Database *db, char *json_output, int max_len, int limit, int offset, const char *search);
 int db_get_user_by_id(Database *db, int id, char *json_output, int max_len);
 int db_update_user(Database *db, int id, const char *username, const char *email);
 int db_delete_user(Database *db, int id);

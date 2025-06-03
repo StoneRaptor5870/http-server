@@ -8,7 +8,15 @@
 #define MAX_METHOD_LENGTH 16
 #define MAX_CONNECTIONS 10
 
-// Database SettingsAdd commentMore actions
+#define MAX_REQUEST_SIZE 8192
+#define MAX_HEADER_LENGTH 1024
+#define MAX_PARAM_KEY_LENGTH 64
+#define MAX_PARAM_VALUE_LENGTH 256
+
+#define MAX_URL_PARAMS 5
+#define MAX_QUERY_PARAMS 10
+
+// Database Settings
 #define DB_NAME "httpserver.db"
 #define ENABLE_WAL_MODE 1
 
