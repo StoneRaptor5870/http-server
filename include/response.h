@@ -29,6 +29,7 @@ void http_response_set_status(HTTP_RESPONSE *response, HTTP_STATUS status);
 void http_response_set_content_type(HTTP_RESPONSE *response, const char *content_type);
 void http_response_set_body(HTTP_RESPONSE *response, const char *body);
 int http_response_build(const HTTP_RESPONSE *response, char *buffer, int buffer_size);
+void http_response_set_body_with_length(HTTP_RESPONSE *response, char* body, int length);
 void http_response_cleanup(HTTP_RESPONSE *response);
 
 #endif // RESPONSE_H

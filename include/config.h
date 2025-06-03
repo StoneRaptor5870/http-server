@@ -12,4 +12,7 @@
 #define DB_NAME "httpserver.db"
 #define ENABLE_WAL_MODE 1
 
+#define STATIC_FILES_DIR "./public"
+#define MAX_FILE_SIZE (10 * 1024 * 1024) // 10MB max file size
+
 #endif // CONFIG_H

@@ -5,9 +5,47 @@
 #include "../include/routes.h"
 #include "../include/database.h"
 #include "../include/utils.h"
+#include "../include/file.h"
+
+void route_get_css(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
+{
+    (void)request;
+
+    if (strcmp(request->path, "/css/style.css") == 0)
+    {
+        serve_static_file(request, response);
+        return;
+    }
+}
+
+void route_get_js(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
+{
+    (void)request;
+
+    if (strcmp(request->path, "/js/app.js") == 0)
+    {
+        serve_static_file(request, response);
+        return;
+    }
+}
 
 void route_home(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
+    // For root path
+    if (strcmp(request->path, "/") == 0)
+    {
+        serve_static_file(request, response);
+        return;
+    }
+
+    // If it's not an API route
+    if (strncmp(request->path, "/api/", 5) != 0)
+    {
+        serve_static_file(request, response);
+        return;
+    }
+
+    // Fallback to original hardcoded HTML
     char body[2048];
     snprintf(body, sizeof(body),
              "<!DOCTYPE html>\n"
@@ -18,39 +56,12 @@ void route_home(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
              "<p>This server is running on port %d</p>\n"
              "<p>Requested path: %s</p>\n"
              "<p><a href=\"/about\">About this server</a></p>\n"
-             "<h2>API Test Form</h2>\n"
-             "<form id=\"userForm\">\n"
-             "  <input type=\"text\" id=\"name\" placeholder=\"Name\" required>\n"
-             "  <input type=\"email\" id=\"email\" placeholder=\"Email\" required>\n"
-             "  <input type=\"password\" id=\"password\" placeholder=\"Password\" required>\n"
-             "  <button type=\"button\" onclick=\"createUser()\">Create User (POST)</button>\n"
-             "  <button type=\"button\" onclick=\"getUsers()\">Get Users (GET)</button>\n"
-             "</form>\n"
-             "<div id=\"result\"></div>\n"
-             "<script>\n"
-             "async function createUser() {\n"
-             "  const name = document.getElementById('name').value;\n"
-             "  const email = document.getElementById('email').value;\n"
-             "  const password = document.getElementById('password').value;\n"
-             "  const response = await fetch('/api/users', {\n"
-             "    method: 'POST',\n"
-             "    headers: {'Content-Type': 'application/json'},\n"
-             "    body: JSON.stringify({name, email, password})\n"
-             "  });\n"
-             "  const result = await response.text();\n"
-             "  document.getElementById('result').innerHTML = result;\n"
-             "}\n"
-             "async function getUsers() {\n"
-             "  const response = await fetch('/api/users');\n"
-             "  const result = await response.text();\n"
-             "  document.getElementById('result').innerHTML = result;\n"
-             "}\n"
-             "</script>\n"
              "</body>\n"
              "</html>\n",
              DEFAULT_PORT, request->path);
 
     http_response_set_status(response, HTTP_200_OK);
+    http_response_set_content_type(response, "text/html");
     http_response_set_body(response, body);
 }
 
@@ -58,27 +69,38 @@ void route_about(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
     (void)request;
 
-    const char *body =
-        "<!DOCTYPE html>\n"
-        "<html>\n"
-        "<head><title>About - My C HTTP Server</title></head>\n"
-        "<body>\n"
-        "<h1>About This Server</h1>\n"
-        "<p>This is a HTTP server written in C.</p>\n"
-        "<p>It demonstrates:</p>\n"
-        "<ul>\n"
-        "<li>Modular code organization</li>\n"
-        "<li>TCP socket programming</li>\n"
-        "<li>HTTP protocol handling (GET, POST, PUT, PATCH, DELETE)</li>\n"
-        "<li>Request parsing and response generation</li>\n"
-        "<li>JSON API endpoints</li>\n"
-        "</ul>\n"
-        "<p><a href=\"/\">Go back to home</a></p>\n"
-        "</body>\n"
-        "</html>\n";
+    if (strcmp(request->path, "/about") == 0)
+    {
+        serve_static_file(request, response);
+        return;
+    }
 
-    http_response_set_status(response, HTTP_200_OK);
-    http_response_set_body(response, body);
+    // If static file not found, serve hardcoded HTML instead
+    if (response->status == HTTP_404_NOT_FOUND)
+    {
+        const char *body =
+            "<!DOCTYPE html>\n"
+            "<html>\n"
+            "<head><title>About - My C HTTP Server</title></head>\n"
+            "<body>\n"
+            "<h1>About This Server</h1>\n"
+            "<p>This is a HTTP server written in C.</p>\n"
+            "<p>It demonstrates:</p>\n"
+            "<ul>\n"
+            "<li>Modular code organization</li>\n"
+            "<li>TCP socket programming</li>\n"
+            "<li>HTTP protocol handling (GET, POST, PUT, PATCH, DELETE)</li>\n"
+            "<li>Request parsing and response generation</li>\n"
+            "<li>JSON API endpoints</li>\n"
+            "</ul>\n"
+            "<p><a href=\"/\">Go back to home</a></p>\n"
+            "</body>\n"
+            "</html>\n";
+
+        http_response_set_status(response, HTTP_200_OK);
+        http_response_set_content_type(response, "text/html");
+        http_response_set_body(response, body);
+    }
 }
 
 // API Routes

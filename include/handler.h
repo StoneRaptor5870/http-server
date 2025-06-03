@@ -16,6 +16,8 @@ void handle_post_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
 void handle_put_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
 void handle_patch_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
 void handle_delete_request(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
+void route_get_js(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
+void route_get_css(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
 
 void route_method_not_allowed(const HTTP_REQUEST *request, HTTP_RESPONSE *response);
 

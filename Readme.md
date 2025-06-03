@@ -190,3 +190,4 @@ Shutting down server...
 
 - v1.0: Initial implementation with basic http server functionality (GET request)
 - v1.1: CRUD routes ( GET, PUT, PATCH, POST, DELETE)
+- v1.2: Static file serving (HTML, CSS, JS)

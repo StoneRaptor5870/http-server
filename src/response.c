@@ -98,3 +98,13 @@ void http_response_cleanup(HTTP_RESPONSE *response)
         response->body_length = 0;
     }
 }
+
+void http_response_set_body_with_length(HTTP_RESPONSE *response, char *body, int length)
+{
+    if (response->body)
+    {
+        free(response->body);
+    }
+    response->body = body;
+    response->body_length = length;
+}

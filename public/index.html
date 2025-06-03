@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My C HTTP Server</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="icon" href="/images/favicon.ico" type="image/x-icon" />
+  </head>
+  <body>
+    <header>
+      <h1>Welcome to My C HTTP Server</h1>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/about">About</a>
+        <a href="/api/users">API</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <h2>Dynamic File Serving</h2>
+        <p>
+          This server now serves static files dynamically from the filesystem!
+        </p>
+      </section>
+
+      <section class="api-demo">
+        <h3>API Test Form</h3>
+        <form id="userForm">
+          <input type="text" id="name" placeholder="Name" required />
+          <input type="email" id="email" placeholder="Email" required />
+          <input
+            type="password"
+            id="password"
+            placeholder="Password"
+            required
+          />
+          <button type="button" onclick="createUser()">Create User</button>
+          <button type="button" onclick="getUsers()">Get Users</button>
+        </form>
+        <div id="result"></div>
+      </section>
+    </main>
+
+    <script src="/js/app.js" defer></script>
+  </body>
+</html>
