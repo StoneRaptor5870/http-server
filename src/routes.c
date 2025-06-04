@@ -112,23 +112,77 @@ void route_get_users(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     }
 
     char json_buffer[4096];
+    UserQueryParams params;
 
-    // Check for query parameters like ?limit=10&offset=20&search=john
+    // Initialize parameters
+    init_user_query_params(&params);
+
+    // Parse HTTP request into database parameters
     const char *limit_str = get_query_param(request, "limit");
     const char *offset_str = get_query_param(request, "offset");
     const char *search_str = get_query_param(request, "search");
 
-    int limit = limit_str ? atoi(limit_str) : 10;   // Default limit
-    int offset = offset_str ? atoi(offset_str) : 0; // Default offset
-
-    printf("Getting users with limit=%d, offset=%d", limit, offset);
-    if (search_str)
+    // Set pagination parameters
+    if (limit_str)
     {
-        printf(", search='%s'", search_str);
+        int limit = atoi(limit_str);
+        if (limit > 0 && limit <= 100) // Add reasonable upper limit
+        {
+            params.limit = limit;
+        }
     }
-    printf("\n");
 
-    int result = db_get_users(&app_db, json_buffer, sizeof(json_buffer), limit, offset, search_str);
+    if (offset_str)
+    {
+        int offset = atoi(offset_str);
+        if (offset >= 0)
+        {
+            params.offset = offset;
+        }
+    }
+
+    // Set search parameter
+    if (search_str && strlen(search_str) > 0)
+    {
+        strncpy(params.search, search_str, sizeof(params.search) - 1);
+        params.search[sizeof(params.search) - 1] = '\0';
+    }
+
+    // Convert query parameters to filters
+    for (int i = 0; i < request->query_param_count && params.filter_count < 10; i++)
+    {
+        const char *key = request->query_params[i].key;
+        const char *value = request->query_params[i].value;
+
+        // Skip reserved parameters
+        if (strcmp(key, "limit") == 0 || strcmp(key, "offset") == 0 ||
+            strcmp(key, "search") == 0 || strlen(value) == 0)
+        {
+            continue;
+        }
+
+        // Add to filters
+        strncpy(params.filters[params.filter_count].key, key,
+                sizeof(params.filters[params.filter_count].key) - 1);
+        params.filters[params.filter_count].key[sizeof(params.filters[params.filter_count].key) - 1] = '\0';
+
+        strncpy(params.filters[params.filter_count].value, value,
+                sizeof(params.filters[params.filter_count].value) - 1);
+        params.filters[params.filter_count].value[sizeof(params.filters[params.filter_count].value) - 1] = '\0';
+
+        params.filter_count++;
+    }
+
+    printf("Getting users with limit=%d, offset=%d, filters=%d\n",
+           params.limit, params.offset, params.filter_count);
+
+    for (int i = 0; i < params.filter_count; i++)
+    {
+        printf("  Filter: %s = %s\n", params.filters[i].key, params.filters[i].value);
+    }
+
+    // Call database function
+    int result = db_get_users(&app_db, json_buffer, sizeof(json_buffer), &params);
 
     if (result >= 0)
     {
@@ -138,7 +192,6 @@ void route_get_users(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     }
     else
     {
-        // Handle error case
         const char *error_json = "{\"error\":\"Failed to retrieve users\"}";
         http_response_set_status(response, HTTP_500_INTERNAL_ERROR);
         http_response_set_content_type(response, "application/json");

@@ -94,39 +94,119 @@ int db_create_user(Database *db, const char *name, const char *email, const char
     return user_id;
 }
 
-int db_get_users(Database *db, char *json_output, int max_len, int limit, int offset, const char *search)
+void init_user_query_params(UserQueryParams *params)
 {
-    if (!db || !db->db || !json_output || max_len <= 0)
+    if (!params)
+        return;
+
+    memset(params, 0, sizeof(UserQueryParams));
+    params->limit = 10; // Default limit
+    params->offset = 0; // Default offset
+    params->filter_count = 0;
+}
+
+int db_get_users(Database *db, char *json_output, int max_len, const UserQueryParams *params)
+{
+    if (!db || !db->db || !json_output || max_len <= 0 || !params)
     {
         return -1;
     }
 
-    char sql[1024];
-    char count_sql[1024];
+    char sql[2048];
+    char count_sql[2048];
+    char where_clause[1024] = "";
+    char *where_ptr = where_clause;
+    int where_remaining = sizeof(where_clause);
+    int has_where = 0;
 
-    if (search && strlen(search) > 0)
+    // Valid column names for security
+    const char *valid_columns[] = {"id", "name", "email", "created_at", NULL};
+
+    // Build dynamic WHERE clause from filters
+    for (int i = 0; i < params->filter_count; i++)
     {
-        // SQL with search functionality
-        snprintf(sql, sizeof(sql),
-                 "SELECT id, name, email, created_at FROM users "
-                 "WHERE name LIKE ? OR email LIKE ? "
-                 "ORDER BY id LIMIT ? OFFSET ?;");
+        const char *key = params->filters[i].key;
+        const char *value = params->filters[i].value;
 
-        snprintf(count_sql, sizeof(count_sql),
-                 "SELECT COUNT(*) FROM users "
-                 "WHERE name LIKE ? OR email LIKE ?;");
+        if (strlen(key) == 0 || strlen(value) == 0)
+        {
+            continue;
+        }
+
+        // Validate column name against whitelist
+        int is_valid_column = 0;
+        for (int j = 0; valid_columns[j] != NULL; j++)
+        {
+            if (strcmp(key, valid_columns[j]) == 0)
+            {
+                is_valid_column = 1;
+                break;
+            }
+        }
+
+        if (!is_valid_column)
+        {
+            continue; // Skip invalid column names
+        }
+
+        // Add WHERE or AND
+        if (!has_where)
+        {
+            int written = snprintf(where_ptr, where_remaining, "WHERE ");
+            where_ptr += written;
+            where_remaining -= written;
+            has_where = 1;
+        }
+        else
+        {
+            int written = snprintf(where_ptr, where_remaining, " AND ");
+            where_ptr += written;
+            where_remaining -= written;
+        }
+
+        // Add condition - using LIKE for flexible matching
+        int written = snprintf(where_ptr, where_remaining, "%s LIKE ?", key);
+        where_ptr += written;
+        where_remaining -= written;
+
+        if (where_remaining <= 0)
+        {
+            fprintf(stderr, "WHERE clause too long\n");
+            return -1;
+        }
     }
-    else
+
+    if (strlen(params->search) > 0)
     {
-        // SQL without search
-        snprintf(sql, sizeof(sql),
-                 "SELECT id, name, email, created_at FROM users "
-                 "ORDER BY id LIMIT ? OFFSET ?;");
+        if (!has_where)
+        {
+            int written = snprintf(where_ptr, where_remaining, "WHERE ");
+            where_ptr += written;
+            where_remaining -= written;
+            has_where = 1;
+        }
+        else
+        {
+            int written = snprintf(where_ptr, where_remaining, " AND ");
+            where_ptr += written;
+            where_remaining -= written;
+        }
 
-        snprintf(count_sql, sizeof(count_sql),
-                 "SELECT COUNT(*) FROM users;");
+        int written = snprintf(where_ptr, where_remaining, "(name LIKE ? OR email LIKE ?)");
+        where_ptr += written;
+        where_remaining -= written;
     }
 
+    // Build SQL queries
+    snprintf(sql, sizeof(sql),
+             "SELECT id, name, email, created_at FROM users %s ORDER BY id LIMIT ? OFFSET ?",
+             where_clause);
+
+    snprintf(count_sql, sizeof(count_sql),
+             "SELECT COUNT(*) FROM users %s",
+             where_clause);
+
+    // Execute count query
     sqlite3_stmt *count_stmt;
     int rc = sqlite3_prepare_v2(db->db, count_sql, -1, &count_stmt, NULL);
     if (rc != SQLITE_OK)
@@ -137,12 +217,44 @@ int db_get_users(Database *db, char *json_output, int max_len, int limit, int of
 
     // Bind parameters for count query
     int param_index = 1;
-    if (search && strlen(search) > 0)
+
+    // Bind filter parameters
+    for (int i = 0; i < params->filter_count; i++)
     {
-        char search_pattern[256];
-        snprintf(search_pattern, sizeof(search_pattern), "%%%s%%", search);
-        sqlite3_bind_text(count_stmt, param_index++, search_pattern, -1, SQLITE_STATIC);
-        sqlite3_bind_text(count_stmt, param_index++, search_pattern, -1, SQLITE_STATIC);
+        const char *key = params->filters[i].key;
+        const char *value = params->filters[i].value;
+
+        if (strlen(key) == 0 || strlen(value) == 0)
+        {
+            continue;
+        }
+
+        // Validate column name
+        int is_valid_column = 0;
+        for (int j = 0; valid_columns[j] != NULL; j++)
+        {
+            if (strcmp(key, valid_columns[j]) == 0)
+            {
+                is_valid_column = 1;
+                break;
+            }
+        }
+
+        if (is_valid_column)
+        {
+            char search_pattern[512];
+            snprintf(search_pattern, sizeof(search_pattern), "%%%s%%", value);
+            sqlite3_bind_text(count_stmt, param_index++, search_pattern, -1, SQLITE_TRANSIENT);
+        }
+    }
+
+    // Bind search parameter if present
+    if (strlen(params->search) > 0)
+    {
+        char search_pattern[512];
+        snprintf(search_pattern, sizeof(search_pattern), "%%%s%%", params->search);
+        sqlite3_bind_text(count_stmt, param_index++, search_pattern, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(count_stmt, param_index++, search_pattern, -1, SQLITE_TRANSIENT);
     }
 
     int total_count = 0;
@@ -152,7 +264,7 @@ int db_get_users(Database *db, char *json_output, int max_len, int limit, int of
     }
     sqlite3_finalize(count_stmt);
 
-    // Now prepare the main query
+    // Execute main query
     sqlite3_stmt *stmt;
     rc = sqlite3_prepare_v2(db->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
@@ -163,17 +275,51 @@ int db_get_users(Database *db, char *json_output, int max_len, int limit, int of
 
     // Bind parameters for main query
     param_index = 1;
-    if (search && strlen(search) > 0)
-    {
-        char search_pattern[256];
-        snprintf(search_pattern, sizeof(search_pattern), "%%%s%%", search);
-        sqlite3_bind_text(stmt, param_index++, search_pattern, -1, SQLITE_STATIC);
-        sqlite3_bind_text(stmt, param_index++, search_pattern, -1, SQLITE_STATIC);
-    }
-    sqlite3_bind_int(stmt, param_index++, limit);
-    sqlite3_bind_int(stmt, param_index++, offset);
 
-    // Start building JSON
+    // Bind filter parameters
+    for (int i = 0; i < params->filter_count; i++)
+    {
+        const char *key = params->filters[i].key;
+        const char *value = params->filters[i].value;
+
+        if (strlen(key) == 0 || strlen(value) == 0)
+        {
+            continue;
+        }
+
+        // Validate column name
+        int is_valid_column = 0;
+        for (int j = 0; valid_columns[j] != NULL; j++)
+        {
+            if (strcmp(key, valid_columns[j]) == 0)
+            {
+                is_valid_column = 1;
+                break;
+            }
+        }
+
+        if (is_valid_column)
+        {
+            char search_pattern[512];
+            snprintf(search_pattern, sizeof(search_pattern), "%%%s%%", value);
+            sqlite3_bind_text(stmt, param_index++, search_pattern, -1, SQLITE_TRANSIENT);
+        }
+    }
+
+    // Bind search parameter if present
+    if (strlen(params->search) > 0)
+    {
+        char search_pattern[512];
+        snprintf(search_pattern, sizeof(search_pattern), "%%%s%%", params->search);
+        sqlite3_bind_text(stmt, param_index++, search_pattern, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, param_index++, search_pattern, -1, SQLITE_TRANSIENT);
+    }
+
+    // Bind limit and offset
+    sqlite3_bind_int(stmt, param_index++, params->limit);
+    sqlite3_bind_int(stmt, param_index++, params->offset);
+
+    // Build JSON response
     int written = snprintf(json_output, max_len, "{\"users\":[");
     if (written >= max_len)
     {
@@ -184,7 +330,6 @@ int db_get_users(Database *db, char *json_output, int max_len, int limit, int of
     int first = 1;
     int user_count = 0;
 
-    // Process each row
     while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
     {
         int id = sqlite3_column_int(stmt, 0);
@@ -192,7 +337,6 @@ int db_get_users(Database *db, char *json_output, int max_len, int limit, int of
         const char *email = (const char *)sqlite3_column_text(stmt, 2);
         const char *created_at = (const char *)sqlite3_column_text(stmt, 3);
 
-        // Add comma for subsequent entries
         if (!first)
         {
             written += snprintf(json_output + written, max_len - written, ",");
@@ -200,7 +344,6 @@ int db_get_users(Database *db, char *json_output, int max_len, int limit, int of
                 break;
         }
 
-        // Add user object - escape quotes in strings to prevent JSON issues
         int user_written = snprintf(json_output + written, max_len - written,
                                     "{\"id\":%d,\"name\":\"%s\",\"email\":\"%s\",\"created_at\":\"%s\"}",
                                     id, name ? name : "", email ? email : "", created_at ? created_at : "");
@@ -220,16 +363,15 @@ int db_get_users(Database *db, char *json_output, int max_len, int limit, int of
         return -1;
     }
 
-    // Close JSON with metadata
     written += snprintf(json_output + written, max_len - written,
                         "],\"count\":%d,\"total\":%d,\"limit\":%d,\"offset\":%d}",
-                        user_count, total_count, limit, offset);
+                        user_count, total_count, params->limit, params->offset);
 
     sqlite3_finalize(stmt);
 
     if (written >= max_len)
     {
-        return -1; // Buffer too small
+        return -1;
     }
 
     return user_count;
