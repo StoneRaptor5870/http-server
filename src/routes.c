@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include "../include/config.h"
 #include "../include/routes.h"
 #include "../include/database.h"
 #include "../include/utils.h"
 #include "../include/file.h"
+
+static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void route_get_css(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
 {
@@ -182,7 +185,9 @@ void route_get_users(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     }
 
     // Call database function
+    pthread_mutex_lock(&db_mutex);
     int result = db_get_users(&app_db, json_buffer, sizeof(json_buffer), &params);
+    pthread_mutex_unlock(&db_mutex);
 
     if (result >= 0)
     {
@@ -240,7 +245,9 @@ void route_get_user_by_id(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
         return;
     }
 
+    pthread_mutex_lock(&db_mutex);
     int result = db_get_user_by_id(&app_db, user_id, user_json, sizeof(user_json));
+    pthread_mutex_unlock(&db_mutex);
 
     if (result > 0)
     {
@@ -328,7 +335,9 @@ void route_create_user(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     }
 
     // Create user in database
+    pthread_mutex_lock(&db_mutex);
     int user_id = db_create_user(&app_db, name, email, password);
+    pthread_mutex_unlock(&db_mutex);
 
     if (user_id > 0)
     {
@@ -435,7 +444,9 @@ void route_update_user(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     }
 
     // Update user in database
+    pthread_mutex_lock(&db_mutex);
     int result = db_update_user(&app_db, user_id, name, email);
+    pthread_mutex_unlock(&db_mutex);
 
     if (result > 0)
     {
@@ -525,7 +536,9 @@ void route_partial_update_user(const HTTP_REQUEST *request, HTTP_RESPONSE *respo
     printf("Partially updating user %d with data: %s\n", user_id, request->body);
 
     // Get current user data
+    pthread_mutex_lock(&db_mutex);
     int user_exists = db_get_user_by_id(&app_db, user_id, current_user_json, sizeof(current_user_json));
+    pthread_mutex_unlock(&db_mutex);
 
     if (user_exists < 0)
     {
@@ -597,7 +610,9 @@ void route_partial_update_user(const HTTP_REQUEST *request, HTTP_RESPONSE *respo
     }
 
     // Update user in database
+    pthread_mutex_lock(&db_mutex);
     int result = db_update_user(&app_db, user_id, name, email);
+    pthread_mutex_unlock(&db_mutex);
 
     if (result > 0)
     {
@@ -662,7 +677,9 @@ void route_delete_user(const HTTP_REQUEST *request, HTTP_RESPONSE *response)
     printf("Deleting user %d\n", user_id);
 
     // Delete user from database
+    pthread_mutex_lock(&db_mutex);
     int result = db_delete_user(&app_db, user_id);
+    pthread_mutex_unlock(&db_mutex);
 
     if (result > 0)
     {

@@ -23,4 +23,8 @@
 #define STATIC_FILES_DIR "./public"
 #define MAX_FILE_SIZE (10 * 1024 * 1024) // 10MB max file size
 
+// Threadpool
+#define DEFAULT_THREAD_COUNT 5
+#define MAX_QUEUE_SIZE 100
+
 #endif // CONFIG_H

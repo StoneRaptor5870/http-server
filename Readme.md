@@ -193,3 +193,4 @@ Shutting down server...
 - v1.2: Static file serving (HTML, CSS, JS)
 - v1.3: Implementation of URL and Query Params.
 - v1.4: Dynamic Query Params and Database filter
+- v1.5: Multithreading and Threadpool

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include "../include/config.h"
 #include "../include/handler.h"
 #include "../include/routes.h"
@@ -15,16 +16,20 @@ void handle_http_request(int client_socket)
     HTTP_RESPONSE response;
     char response_buffer[MAX_RESPONSE_SIZE];
 
+    struct timeval timeout = {2, 0}; // 2 seconds
+    setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
     // Read the request
     int bytes_received = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
-    if (bytes_received < 0)
+    if (bytes_received <= 0)
     {
-        perror("recv failed");
+        // perror("recv failed");
+        close(client_socket);  // Doing this to ignore empty connections from client (browser)
         return;
     }
 
     buffer[bytes_received] = '\0';
-    printf("Received request:\n%s\n", buffer);
+    printf("Raw request (%d bytes): '%s'\n", bytes_received, buffer);
 
     // Parse the request
     if (http_request_parse(buffer, &request) < 0)
